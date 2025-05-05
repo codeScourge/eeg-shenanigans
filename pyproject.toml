@@ -5,9 +5,13 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "flask>=3.1.0",
     "mne>=1.9.0",
     "numpy==1.26.4",
     "onnxruntime>=1.21.0",
+    "pydispatcher>=2.0.7",
+    "python-dispatch>=0.2.2",
+    "python-dotenv>=1.1.0",
     "pytorch-lightning>=2.5.1",
     "torch==2.3.0",
     "torchaudio>=2.3.0",
