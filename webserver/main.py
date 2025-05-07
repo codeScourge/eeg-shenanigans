@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, render_template
 from inference import predict
 import dotenv
 import time
@@ -19,7 +19,17 @@ Inputs to Update:
 dotenv.load_dotenv()
 
 # --- vars & consts
-cogload_scale:float = 0 # global variable - will be between 0 and 1 with 1 being highest possible load
+def update_cogload(value):
+    with open('cogload.txt', 'w') as f:
+        f.write(str(value))
+
+def get_cogload():
+    try:
+        with open('cogload.txt', 'r') as f:
+            return float(f.read().strip())
+    except:
+        return 0.0
+
 last_inference:float = time.time()  # return seconds since epoch
 
 ch_names = ['AF3', 'F7', 'F3', 'FC5', 'T7', 'P7', 'O1', 'O2', 'P8', 'T8', 'FC6', 'F4', 'F8', 'AF4']
@@ -178,7 +188,7 @@ class Subscribe():
 
 
     def on_new_com_data(self, *args, **kwargs):
-        print("on_new_com_data")
+        global loaded_profile
         """
         To handle mental command data emitted from Cortex
 
@@ -187,8 +197,6 @@ class Subscribe():
         data: dictionary
              The values in the array pow match the labels in the array labels return at on_new_com_data_labels
         """
-
-        global loaded_profile
 
 
         if loaded_profile == False:
@@ -278,14 +286,15 @@ def handle_eeg_data(eeg_data):
                 pred = np.argmax(probs, axis=1) # 0 for low, 1 for high probably
                 
                 end = time.perf_counter()
-                print(f"predicted {pred[0]} at {probs[0][pred[0]]}% in: {(end - start) * 1000:.3f} ms")
+                confidence = probs[0][pred[0]]
+                
+                update_cogload(confidence)
+                print(f"predicted {pred[0]} at {confidence}% in: {(end - start) * 1000:.3f} ms")
                 
         else:
             raise ValueError("channels from stream doesn't match channel expected")
                 
-                
-    # TODO: for inference we need to aggregate data until we have 4seconds worth, after which we constantly check if it has been a second till the last data was added
-
+            
 
 # --- init
 app = Flask(__name__)
@@ -308,18 +317,18 @@ def cleanup_resources(exception=None):
 # --- routes
 @app.get("/data")
 def dataRoute():
+    value = get_cogload()
     return jsonify({
-        "cogload": cogload_scale
+        "cogload": str(value)
     })
     
+@app.get("/")
+def mainRoute():
+    return render_template("main.html")
     
-    
-
-
 
 # --- running
 if __name__ == "__main__":
     print("starting webserver")
-    time.sleep(3)
-    app.run(port=8080)
+    app.run(port=8080, debug=True)
 
