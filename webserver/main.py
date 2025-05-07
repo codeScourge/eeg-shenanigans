@@ -1,8 +1,8 @@
 from flask import Flask, jsonify, render_template
-from inference import predict
 import dotenv
 import time
 from _cortex import Cortex
+from _inference import predict
 import threading
 import numpy as np
 import os
