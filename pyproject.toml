@@ -10,6 +10,7 @@ dependencies = [
     "numpy==1.26.4",
     "onnxruntime>=1.21.0",
     "pydispatcher>=2.0.7",
+    "pylsl>=1.17.6",
     "python-dispatch>=0.2.2",
     "python-dotenv>=1.1.0",
     "pytorch-lightning>=2.5.1",

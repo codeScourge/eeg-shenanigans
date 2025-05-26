@@ -381,6 +381,7 @@ dependencies = [
     { name = "numpy" },
     { name = "onnxruntime" },
     { name = "pydispatcher" },
+    { name = "pylsl" },
     { name = "python-dispatch" },
     { name = "python-dotenv" },
     { name = "pytorch-lightning" },
@@ -398,6 +399,7 @@ requires-dist = [
     { name = "numpy", specifier = "==1.26.4" },
     { name = "onnxruntime", specifier = ">=1.21.0" },
     { name = "pydispatcher", specifier = ">=2.0.7" },
+    { name = "pylsl", specifier = ">=1.17.6" },
     { name = "python-dispatch", specifier = ">=0.2.2" },
     { name = "python-dotenv", specifier = ">=1.1.0" },
     { name = "pytorch-lightning", specifier = ">=2.5.1" },
@@ -1418,6 +1420,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/21/db/030d0700ae90d2f9d52c2f3c1f864881e19cef8cba3b0a08759c8494c19c/PyDispatcher-2.0.7.tar.gz", hash = "sha256:b777c6ad080dc1bad74a4c29d6a46914fa6701ac70f94b0d66fbcfde62f5be31", size = 38891 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/66/0e/9ee7bc0b48ec45d93b302fa2d787830dca4dc454d31a237faa5815995988/PyDispatcher-2.0.7-py3-none-any.whl", hash = "sha256:96543bea04115ffde08f851e1d45cacbfd1ee866ac42127d9b476dc5aefa7de0", size = 12040 },
+]
+
+[[package]]
+name = "pylsl"
+version = "1.17.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3f/fd/2cb39e07d09f3aa40bc39d880adcc8bfa08fc9b8de993340e6a7555899f8/pylsl-1.17.6.tar.gz", hash = "sha256:8f3cea0c54a27785a43a27e9524f1dee885fe149f4703eed060168923b1695a3", size = 39856 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9a/fa/38f3ec8ac9073e53c65d850d8d6f51cbb87dbfcb59db5215fe7c7584e6e5/pylsl-1.17.6-py2.py3-none-any.whl", hash = "sha256:78d935d3d944cd572464f6200fcdf3958866b2e3180dea3da83e43a19517acf5", size = 41775 },
+    { url = "https://files.pythonhosted.org/packages/5a/8d/0c8818c1a8aecc2a09d9f5df92b0bd321bd73f780c4928ccf0d5952951ad/pylsl-1.17.6-py2.py3-none-win32.whl", hash = "sha256:d9a68e86a073b59582b697c2baf1757b067da155e5fb017e30cefb7aa6d22f6d", size = 293781 },
+    { url = "https://files.pythonhosted.org/packages/92/a9/b24df99c2dcb128a404dff05a592aa457763d45274c793395919b9b120a6/pylsl-1.17.6-py2.py3-none-win_amd64.whl", hash = "sha256:a5ead3e28ccdd7a08a6523adc797d6f737a1e446f684a8bd4818d784b50d89ba", size = 364212 },
 ]
 
 [[package]]
