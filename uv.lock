@@ -111,6 +111,18 @@ wheels = [
 ]
 
 [[package]]
+name = "brainflow"
+version = "5.16.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "setuptools" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/07/0e/764aa5632be8dd1be36e21ec878bbd844a3333e944e6beaf503b66d2530a/brainflow-5.16.0-py3-none-any.whl", hash = "sha256:2badde93daeb7b54d52ebda63c713a7ea4ed9ad61829c877d7752b3f6bf2419b", size = 28648416 },
+]
+
+[[package]]
 name = "certifi"
 version = "2025.1.31"
 source = { registry = "https://pypi.org/simple" }
@@ -376,6 +388,7 @@ name = "eeg-shenanigans"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "brainflow" },
     { name = "flask" },
     { name = "mne" },
     { name = "numpy" },
@@ -394,6 +407,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "brainflow", specifier = ">=5.16.0" },
     { name = "flask", specifier = ">=3.1.0" },
     { name = "mne", specifier = ">=1.9.0" },
     { name = "numpy", specifier = "==1.26.4" },

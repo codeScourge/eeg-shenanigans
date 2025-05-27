@@ -1,8 +1,8 @@
 from flask import Flask, jsonify, render_template
 import dotenv
 import time
-from _inference import predict
-from lsl import list_available_lsl_streams, start_eeg_stream
+from _inference import predict_cogload, predict_focus
+from lsl_read import list_available_lsl_streams, start_eeg_stream
 import numpy as np
 import os
 
@@ -16,8 +16,14 @@ glob_last_inference:float = time.time()  # return seconds since epoch
 glob_cogload = 0    # between 0 and 1 (corresponds to 100% and 200% video speed)
 glob_focus = 0  # between 0 and 1 (corresponds to completely drowsy vs full focus)
 
+expected_channels = ['F7','F3','P7','O1','O2','P8','F4']
+expected_sfreq = 128  
 
-def handle_eeg(buffer, sfreq):
+def softmax(x):
+    exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))
+    return exp_x / np.sum(exp_x, axis=1, keepdims=True)
+
+def handle_eeg(buffer, sfreq, real_channels:list):
     global glob_last_inference, glob_cogload, glob_focus
     
     # run every half second max
@@ -25,25 +31,49 @@ def handle_eeg(buffer, sfreq):
         return
     
     glob_last_inference = time.time()
-
     
+    # check if needed channel exist
+    channel_idxs=[]
+    for channel in expected_channels:
+        if channel in real_channels:
+            channel_idxs.append(real_channels.index(channel))
+        else:
+            raise Exception(f"{channel} missing in real_channels: {real_channels}")
+        
+    # and right sampling
+    if sfreq != expected_sfreq:
+        raise Exception(f"{sfreq} is not the expected sampling rate of {expected_sfreq}")
+    
+    # --- skipping last channel
     # 4 seconds needed for cogload
     if len(buffer) >= (sfreq * 4):
         start = time.perf_counter()
-
-        data = np.array(buffer[-sfreq*4:]).T
-        probs = predict(data)
-        pred = np.argmax(probs, axis=1) # 0 for low, 1 for high probably
+        data = np.array(buffer[int(-sfreq*4):]).T[channel_idxs]
+        
+        logits = predict_cogload(data, sfreq)
+        probs = softmax(logits)
+        
+        # pred = np.argmax(logits, axis=1)[0] # 0 for low, 1 for high probably
+        # print(logits, probs, pred)
         
         end = time.perf_counter()
-        confidence = probs[0][pred[0]]
         
-        glob_cogload = confidence
-        print(f"predicted {pred[0]} at {confidence}% in: {(end - start) * 1000:.3f} ms")
+        glob_cogload = probs[0][1]
+        print(f"predicted cognitive load {probs[0][1]} (1=high) in: {(end - start) * 1000:.3f} ms")
     
     # 15 seconds needed for focus
     if len(buffer) >= (sfreq * 15):
-        pass # TODO
+        start = time.perf_counter()
+
+        data = np.array(buffer[int(-sfreq*15):]).T[channel_idxs]
+        
+        prob = predict_focus(data, sfreq)
+        pred = prob >= 0.5
+        
+        end = time.perf_counter()
+        
+        glob_focus = prob
+        print(f"predicted focus {pred} ({prob}% of it being focused) in: {(end - start) * 1000:.3f} ms")
 
 # --- init
 app = Flask(__name__)
@@ -76,21 +106,19 @@ if __name__ == "__main__":
         exit()
 
     stream_idx = int(input("Enter the number of the stream you want to capture: ")) - 1
-    stream_info = start_eeg_stream(stream_index=stream_idx, handle_eeg=handle_eeg, max_rate=128)
+    stream_info = start_eeg_stream(stream_idx, handle_eeg=handle_eeg, max_rate=128)
+  
+    # real_channels = stream_info["ch_names"]
+    # real_sfreq = stream_info["sfreq"]
     
-    expected_channels = ['AF3', 'F7', 'F3', 'FC5', 'T7', 'P7', 'O1', 'O2', 'P8', 'T8', 'FC6', 'F4', 'F8', 'AF4']
-    expected_sfreq = 128    
+    # for channel in expected_channels:
+    #     if channel not in real_channels:
+    #         stream_info['stop_flag'].set()
+    #         raise Exception(f"{channel} is missing in real channels: {str(real_channels)}")
     
-    real_channels = stream_info["ch_names"]
-    real_sfreq = stream_info["sfreq"]
-    
-    if real_channels != expected_channels:
-        stream_info['stop_flag'].set()
-        raise Exception(f"{str(real_channels)} is not as expected")
-    
-    if real_sfreq != expected_sfreq:
-        stream_info['stop_flag'].set()
-        raise Exception(f"{str(real_sfreq)} is not as expected")
+    # if real_sfreq != expected_sfreq:
+    #     stream_info['stop_flag'].set()
+    #     raise Exception(f"{str(real_sfreq)} is not as expected")
     
     print("starting webserver")
     app.run(port=8080, debug=True)
