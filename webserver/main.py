@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, render_template_string
 import dotenv
 import time
 from _inference import predict_cogload, predict_focus
@@ -91,9 +91,30 @@ def dataRoute():
     })
     
 @app.get("/")
-def mainRoute():
-    return render_template("main.html")
+def home_route():
+    return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Navigation</title>
+</head>
+<body>
+    <h1>Main Page</h1>
+    <nav>
+        <a href="/focus">Focus</a>
+        <a href="/cogload">Cognitive Load</a>
+    </nav>
+</body>
+</html>              
+    """)
     
+@app.get("/cogload")
+def cogload_route():
+    return render_template("cogload.html")
+
+@app.get("/focus")
+def focus_route():
+    return render_template("focus.html")
 
 
 
@@ -107,6 +128,9 @@ if __name__ == "__main__":
 
     stream_idx = int(input("Enter the number of the stream you want to capture: ")) - 1
     stream_info = start_eeg_stream(stream_idx, handle_eeg=handle_eeg, max_rate=128)
+    print("\n\n--- info about stream ---")
+    print(stream_info)
+    print("-------------------------\n\n")
   
     # real_channels = stream_info["ch_names"]
     # real_sfreq = stream_info["sfreq"]
@@ -121,7 +145,7 @@ if __name__ == "__main__":
     #     raise Exception(f"{str(real_sfreq)} is not as expected")
     
     print("starting webserver")
-    app.run(port=8080, debug=True)
+    app.run(host="127.0.0.1", port=8080, debug=False)
     
     print("flask exited, closing stream")
     stream_info['stop_flag'].set()

@@ -18,8 +18,8 @@ emotions using DREAEMER: [![Open STEW In Colab](https://colab.research.google.co
 
 cogload using STEW: [![Open STEW In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/codeScourge/eeg-shenanigans/blob/main/train_stew.ipynb)
 - idk
-- 8ch intra-subject only: 50min, 97% train 78% val, 79% test
-- 8ch extra-subjec: 30min, 92% train, 77% val, 76% test
+- 7ch intra-subject only: 50min, 97% train 78% val, 79% test
+- 7ch extra-subject I think: 30min, 92% train, 77% val, 76% test
 
 ---
 
