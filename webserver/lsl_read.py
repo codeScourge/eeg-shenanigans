@@ -43,11 +43,8 @@ def start_eeg_stream(stream_index, handle_eeg=None, max_rate=128):
         
     print(f"Streaming from '{info.name()}' with {ch_count} channels at {sfreq} Hz")
     
-    
-    buffer = []
     stop_flag = threading.Event()
     
-
     result = {
         'stop_flag': stop_flag,
         'ch_names': ch_names,
