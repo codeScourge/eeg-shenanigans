@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EEG Focus Calibration</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/focus_callibration.css') }}">
+</head>
+<body>
+    {% if already_started %}
+    <div class="container">
+        <div id="session-active">
+            <h1>Calibration Already in Progress</h1>
+            <p>An EEG calibration session is already running.</p>
+            <p>Please wait for the current session to complete or restart the application.</p>
+        </div>
+    </div>
+    {% else %}
+    <div class="container">
+        <div id="instructions">
+            <h1>EEG Focus Calibration</h1>
+            <p>This tool will help calibrate your EEG device by collecting data during focused and unfocused states.</p>
+            <p>Instructions:</p>
+            <ol>
+                <li>Ensure your EEG device is properly connected</li>
+                <li>Click "Start Calibration" when ready</li>
+                <li>Follow the on-screen prompts</li>
+                <li>Remain still during the entire process</li>
+            </ol>
+            <button id="startBtn">Start Calibration</button>
+        </div>
+        
+        <div id="focusTask" class="hidden">
+            <div id="statusText">Get ready...</div>
+            <div id="circleContainer">
+                <div id="targetCircle"></div>
+            </div>
+            <div id="progressBar">
+                <div id="progress"></div>
+            </div>
+            <div id="timer">00:00</div>
+        </div>
+        
+        <div id="unfocusTask" class="hidden">
+            <div id="unfocusStatusText">Relax your mind...</div>
+            <div id="blurContainer"></div>
+            <div id="unfocusProgressBar">
+                <div id="unfocusProgress"></div>
+            </div>
+            <div id="unfocusTimer">00:00</div>
+        </div>
+        
+        <div id="results" class="hidden">
+            <h2>Calibration Complete</h2>
+            <p>Thank you! The EEG data has been collected successfully.</p>
+            <button id="restartBtn">Restart Calibration</button>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/focus_callibration.js') }}"></script>
+    {% endif %}
+</body>
+</html>

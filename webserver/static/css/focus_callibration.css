@@ -1,0 +1,147 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Arial', sans-serif;
+}
+
+body {
+    background-color: #f5f5f5;
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    min-height: 80vh;
+    margin-top: 5vh;
+    position: relative;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #2c3e50;
+}
+
+p, ol {
+    margin-bottom: 20px;
+}
+
+ol {
+    padding-left: 20px;
+}
+
+button {
+    display: block;
+    margin: 30px auto;
+    padding: 12px 24px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #2980b9;
+}
+
+.hidden {
+    display: none;
+}
+
+#focusTask, #unfocusTask {
+    text-align: center;
+    height: 70vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#statusText, #unfocusStatusText {
+    font-size: 24px;
+    margin: 20px 0;
+    font-weight: bold;
+}
+
+#circleContainer {
+    width: 100%;
+    height: 400px;
+    position: relative;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+    overflow: hidden;
+}
+
+#targetCircle {
+    width: 50px;
+    height: 50px;
+    background-color: #e74c3c;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    transition: all 0.8s ease-out;
+}
+
+#blurContainer {
+    width: 100%;
+    height: 400px;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><filter id="blur"><feGaussianBlur stdDeviation="5" /></filter><rect width="100%" height="100%" fill="%23f0f0f0" filter="url(%23blur)"/><circle cx="50%" cy="50%" r="100" fill="%23e0e0e0" filter="url(%23blur)"/></svg>');
+    border-radius: 5px;
+    opacity: 0.7;
+}
+
+#progressBar, #unfocusProgressBar {
+    width: 100%;
+    height: 10px;
+    background-color: #ecf0f1;
+    border-radius: 5px;
+    margin: 20px 0;
+    overflow: hidden;
+}
+
+#progress, #unfocusProgress {
+    height: 100%;
+    width: 0%;
+    background-color: #2ecc71;
+    transition: width 1s linear;
+}
+
+#timer, #unfocusTimer {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+#results {
+    text-align: center;
+    padding: 40px 0;
+}
+
+#results h2 {
+    margin-bottom: 20px;
+    color: #27ae60;
+}
+
+#session-active {
+    text-align: center;
+    padding: 40px 20px;
+    background-color: #f8d7da;
+    border-radius: 5px;
+    color: #721c24;
+}
+
+#session-active h1 {
+    color: #721c24;
+}

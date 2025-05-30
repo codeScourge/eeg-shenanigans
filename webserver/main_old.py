@@ -2,7 +2,7 @@ from flask import Flask, jsonify, render_template
 import dotenv
 import time
 from _cortex import Cortex
-from _inference import predict
+from webserver._models import predict
 import threading
 import numpy as np
 import os

@@ -3,6 +3,7 @@ from pylsl import StreamInlet, resolve_streams
 import time
 import threading
 
+
 def list_available_lsl_streams():
     """List all available LSL streams on the network"""
     streams = resolve_streams()
@@ -51,7 +52,6 @@ def start_eeg_stream(stream_index, handle_eeg=None, max_rate=128):
         'stop_flag': stop_flag,
         'ch_names': ch_names,
         'sfreq': sfreq,
-        'buffer': buffer
     }
     
 
@@ -64,22 +64,12 @@ def start_eeg_stream(stream_index, handle_eeg=None, max_rate=128):
             current_time = time.time()
             elapsed = current_time - last_sample_time
             
-            # Limit sampling rate
+            # only sample (from lsl) at a max freq of provided max_rate (which in theory should be the same as our headset sfreq)
             if elapsed >= min_time_between_samples:
-                # Get a sample
                 sample, timestamp = inlet.pull_sample(timeout=0.0)
                 
-                if sample:
-                    buffer.append(sample)
-                    
-                    # Limit buffer size to prevent memory issues (keep last 30 seconds)
-                    if len(buffer) > (sfreq * 30):
-                        buffer[:] = buffer[-(int(sfreq * 30)):]
-                    
-                    # Call handle_eeg function if provided
-                    if handle_eeg:
-                        handle_eeg(buffer, sfreq, ch_names)
-                    
+                if sample and handle_eeg:
+                    handle_eeg(sample, sfreq, ch_names)
                     last_sample_time = current_time
             else:
                 # Sleep a bit to avoid consuming too much CPU

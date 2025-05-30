@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, render_template, render_template_string
 import dotenv
 import time
-from _inference import predict_cogload, predict_focus
+from _models import predict_cogload, predict_focus
 from lsl_read import list_available_lsl_streams, start_eeg_stream
 import numpy as np
 import os
@@ -13,24 +13,59 @@ dotenv.load_dotenv()
 
 # --- main handling function
 glob_last_inference:float = time.time()  # return seconds since epoch
+glob_buffer = []
 glob_cogload = 0    # between 0 and 1 (corresponds to 100% and 200% video speed)
 glob_focus = 0  # between 0 and 1 (corresponds to completely drowsy vs full focus)
 
 expected_channels = ['F7','F3','P7','O1','O2','P8','F4']
 expected_sfreq = 128  
 
+# - callibration shit
+glob_focus_callibration_started = False
+
+def handle_focus_callibration(sfreq):
+    global glob_focus_callibration_started, glob_buffer
+    
+    buffer = glob_buffer[-sfreq*80:]
+    print("\n\n--- imagine we just finetune ---\n\n") # TODO finetune 
+    
+    glob_focus_callibration_started = False
+    
+    
+
+# - 
 def softmax(x):
     exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))
     return exp_x / np.sum(exp_x, axis=1, keepdims=True)
 
-def handle_eeg(buffer, sfreq, real_channels:list):
-    global glob_last_inference, glob_cogload, glob_focus
+
+# - passed to subthread
+def handle_eeg(sample, sfreq:float, real_channels:list):
+    global glob_last_inference, glob_cogload, glob_focus, glob_buffer
+    global glob_focus_callibration_started
     
-    # run every half second max
+    # --- append to buffer - limit to 180s !!!!!
+    glob_buffer.append(sample)
+
+    if len(glob_buffer) > (sfreq * 180):
+        glob_buffer[:] = glob_buffer[-(int(sfreq * 180)):]
+
+
+    # --- collect to buffer if
+    if glob_focus_callibration_started and (len(glob_buffer) >= int(sfreq * 80)):
+        handle_focus_callibration()
+        
+        
+    # --- run inference only every half second max
     if (time.time() - glob_last_inference) < 0.5:
         return
     
     glob_last_inference = time.time()
+    
+    
+    # -- handle shitty openbci stream
+    if real_channels == ['', '', '', '', '', '', '', '']:
+        real_channels = ['F7','F3','P7','O1','O2','P8','F4']
     
     # check if needed channel exist
     channel_idxs=[]
@@ -46,9 +81,9 @@ def handle_eeg(buffer, sfreq, real_channels:list):
     
     # --- skipping last channel
     # 4 seconds needed for cogload
-    if len(buffer) >= (sfreq * 4):
+    if len(glob_buffer) >= (sfreq * 4):
         start = time.perf_counter()
-        data = np.array(buffer[int(-sfreq*4):]).T[channel_idxs]
+        data = np.array(glob_buffer[int(-sfreq*4):]).T[channel_idxs]
         
         logits = predict_cogload(data, sfreq)
         probs = softmax(logits)
@@ -62,10 +97,10 @@ def handle_eeg(buffer, sfreq, real_channels:list):
         print(f"predicted cognitive load {probs[0][1]} (1=high) in: {(end - start) * 1000:.3f} ms")
     
     # 15 seconds needed for focus
-    if len(buffer) >= (sfreq * 15):
+    if len(glob_buffer) >= (sfreq * 15):
         start = time.perf_counter()
 
-        data = np.array(buffer[int(-sfreq*15):]).T[channel_idxs]
+        data = np.array(glob_buffer[int(-sfreq*15):]).T[channel_idxs]
         
         prob = predict_focus(data, sfreq)
         pred = prob >= 0.5
@@ -104,6 +139,9 @@ def home_route():
         <a href="/focus">Focus</a>
         <a href="/cogload">Cognitive Load</a>
     </nav>
+    <nav>
+        <a href="/focus_callibration">Focus callibration client</a>
+    </nav>
 </body>
 </html>              
     """)
@@ -116,6 +154,36 @@ def cogload_route():
 def focus_route():
     return render_template("focus.html")
 
+@app.get("/focus_callibration")
+def focus_callibration_client_route():
+    global glob_focus_callibration_started
+    
+    return render_template("focus_callibration.html", already_started=glob_focus_callibration_started)
+
+@app.get("/start_focus_callibration")
+def focus_callibration_route_start():
+    global glob_focus_callibration_started
+    
+    if glob_focus_callibration_started:
+        return jsonify({"msg": "callibration already started"}), 400
+    
+    else:
+        glob_focus_callibration_started = True
+        print("\n\n--- starting focus callibration recording ---\n\n")
+        return jsonify({"msg": "callibration started"}), 200
+    
+    
+@app.post("/start_focus_callibration")
+def focus_callibration_route_stop():
+    global glob_focus_callibration_started
+    
+    if not glob_focus_callibration_started:
+        return jsonify({"msg": "callibration not started"}), 400
+    
+    else:
+        glob_focus_callibration_started = False
+        print("\n\n--- stopping focus callibration recording ---\n\n")
+        return jsonify({"msg": "callibration ended"}), 200
 
 
 # --- running

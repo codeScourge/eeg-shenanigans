@@ -2,6 +2,8 @@ from torcheeg import transforms
 import onnxruntime as ort
 import numpy as np
 from scipy.signal import windows
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
 import joblib
 import os
 
@@ -59,6 +61,7 @@ def predict_cogload(raw_data:np.ndarray, sfreq=128):
 
 # --- focus model
 svm_path = "./svm_0.pkl"    # focus vs rest
+svm_path_dirty = "./dirty_svm_0.pkl"
 scaler_path = "./scaler.pkl"
 
 
@@ -68,8 +71,12 @@ if not os.path.exists(svm_path):
 if not os.path.exists(scaler_path):
     raise FileNotFoundError("need /webserver/scaler.pkl file with model")
         
-clf = joblib.load(svm_path)
 scaler = joblib.load(scaler_path)
+
+if os.path.exists(svm_path_dirty):
+    clf = joblib.load(svm_path_dirty)
+else:
+    clf = joblib.load(svm_path)
 
 def predict_focus(raw_data: np.ndarray, sfreq=128):
     """
@@ -183,3 +190,63 @@ def predict_focus(raw_data: np.ndarray, sfreq=128):
     # print(f"Probabilities shape: {probs.shape}")
     
     return probs
+
+
+class IncrementalSVC(SVC):
+    def __init__(self, C=1.0, kernel='rbf', degree=3, gamma='scale',
+                 coef0=0.0, shrinking=True, probability=False,
+                 tol=1e-3, cache_size=200, class_weight=None,
+                 verbose=False, max_iter=-1, decision_function_shape='ovr',
+                 break_ties=False, random_state=None):
+
+        super().__init__(
+            C=C, kernel=kernel, degree=degree, gamma=gamma,
+            coef0=coef0, shrinking=shrinking, probability=probability,
+            tol=tol, cache_size=cache_size, class_weight=class_weight,
+            verbose=verbose, max_iter=max_iter,
+            decision_function_shape=decision_function_shape,
+            break_ties=break_ties, random_state=random_state
+        )
+        self.X_train = None
+        self.y_train = None
+
+    def partial_fit(self, X, y, classes=None):
+        """Incrementally fit the model by storing all data and retraining."""
+        # First time training
+        if self.X_train is None:
+            self.X_train = X.copy()
+            self.y_train = y.copy()
+        else:
+            # Append new data
+            self.X_train = np.vstack((self.X_train, X))
+            self.y_train = np.append(self.y_train, y)
+
+        # Retrain on all data
+        super().fit(self.X_train, self.y_train)
+        return self
+
+def finetune_focus(raw_focused: np.ndarray, raw_unfocused: np.ndarray, sfreq=128):
+    """
+    expects two 40s array (which at 128Hz would mean 5120 each)
+    """
+    
+    if (len(raw_focused) / sfreq != 40) or (len(raw_unfocused) / sfreq != 40):
+        raise Exception("wrong length")
+    
+    
+    # since even first item requires 14s previosly, this means that 40s yields 26 items
+    x = []
+    y = []
+    for i in range(14, 40):
+        x.append(raw_focused[i])
+        y.append(1)
+        x.append(raw_unfocused[i])
+        y.append(0)
+        
+        
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.2, stratify=y
+    )
+    
+    return
+    
