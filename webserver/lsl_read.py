@@ -75,7 +75,7 @@ def start_eeg_stream(stream_index, handle_eeg=None, max_rate=128):
         while not stop_flag.is_set():
             sample, timestamp = inlet.pull_sample(timeout=0.0)
             if sample:
-                handle_eeg(sample)
+                handle_eeg(sample, timestamp)
             time.sleep(0.001)
     
   

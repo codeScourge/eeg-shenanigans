@@ -1,10 +1,10 @@
-from flask import Flask, jsonify, render_template, render_template_string
+from flask import Flask, jsonify, render_template, render_template_string, request
 import dotenv
 import time
 from _models import predict_cogload, predict_focus
 from lsl_read import list_available_lsl_streams, start_eeg_stream
 import numpy as np
-from _helpers import softmax
+from _helpers import softmax, find_closest_timestamp_index
 from scipy import signal
 import os
 
@@ -19,6 +19,7 @@ expected_channels = ['F7','F3','P7','O1','O2','P8','F4']
 expected_sfreq = 128  
 
 glob_buffer = []
+glob_timestamps = []
 glob_channel_idxs = []
 glob_sfreq = 128
 
@@ -26,25 +27,28 @@ glob_sfreq = 128
 
 
 # --- callibration shit
-glob_focus_callibration_started = False
-
-def handle_focus_callibration():
+def handle_focus_calibration(buffer:list, timestamps:list, sfreq:float, channel_idxs:list, start_callibration_timestamp:float):
     """
-    expects an already downsampled buffer with at least 80 seconds filled of expected_sfreq - channel_idxs to identify what is where
+    expects an already downsampled buffer with at least 86 seconds filled of expected_sfreq - channel_idxs to identify what is where
     """
     
-    global glob_buffer, glob_sfreq, glob_channel_idxs, glob_focus_callibration_started, expected_sfreq
+    # 0-3s pause
+    # 3-43s focused
+    # 43-46s pause
+    # 46-86s unfocused
+    start_index = find_closest_timestamp_index(timestamps, start_callibration_timestamp)
+    f_start = start_index+(3*sfreq)
+    f_end = start_index+(43*sfreq)
+    u_start = start_index+(46*sfreq)
+    u_end = start_index+(86*sfreq)
     
-    
-    buffer = down_sample_if_needed(glob_buffer, glob_sfreq, expected_sfreq)
-    focused_buffer = np.array(buffer[int(-expected_sfreq*83):int(-expected_sfreq*43)]).T[glob_channel_idxs]
-    unfocused_buffer = np.array(buffer[int(-expected_sfreq*40):]).T[glob_channel_idxs]
+    focused_buffer = np.array(buffer[f_start:f_end]).T[channel_idxs]
+    unfocused_buffer = np.array(buffer[u_start:u_end]).T[channel_idxs]
     
     print("\n\n--- imagine we just finetune ---\n\n") # TODO finetune 
     np.save("./datasets/focused.npy", focused_buffer)
     np.save("./datasets/unfocused.npy", unfocused_buffer)
     
-    glob_focus_callibration_started = False
     
 
 
@@ -115,25 +119,23 @@ def down_sample(buffer, source_sfreq:float, target_sfreq:float):
 
 
 # --- main handling function, passed to subthread
-def handle_eeg(sample):
-    global glob_focus_callibration_started, glob_buffer, glob_sfreq
+def handle_eeg(sample, timestamp):
+    """
+    only called when sample is not None
+    timestamp is in unix time
+    """
     
+    global glob_buffer, glob_sfreq, glob_timestamps
     
-    # --- constantly append to buffer global variable, holding up to 180s (sliding window)
+    # --- constantly append to buffer global variable (sliding window)
     glob_buffer.append(sample)
+    glob_timestamps.append(timestamp)
 
-    if len(glob_buffer) > (glob_sfreq * 180):
-        glob_buffer[:] = glob_buffer[-(int(glob_sfreq * 180)):]
+    max_buffer_length = 180 # in seconds
+    if len(glob_buffer) > (glob_sfreq * max_buffer_length):
+        glob_buffer[:] = glob_buffer[-(int(glob_sfreq * max_buffer_length)):]
+        glob_timestamps[:] = glob_timestamps[-(int(glob_sfreq * max_buffer_length)):]
 
-        
-    
-    # --- when finetuning: and we have reached the 80s data collection time, handle the finetuning step
-    if glob_focus_callibration_started and (len(glob_buffer) >= int(glob_sfreq * 86)):
-        handle_focus_callibration()
-    # else:
-        # TODO: switch to something with timestamps, this bitch is still shifting
-        # print(f"started {time.time() - started} seconds ago, so far only {len(glob_buffer) / glob_sfreq}")
-    
 
 # --- init
 app = Flask(__name__)
@@ -206,7 +208,7 @@ def home_route():
         <a href="/cogload">Cognitive Load</a>
     </nav>
     <nav>
-        <a href="/focus_callibration">Focus callibration client</a>
+        <a href="/focus_calibration">Focus callibration client</a>
     </nav>
 </body>
 </html>              
@@ -220,36 +222,34 @@ def cogload_route():
 def focus_route():
     return render_template("focus.html")
 
-@app.get("/focus_callibration")
-def focus_callibration_client_route():
-    global glob_focus_callibration_started
+@app.route("/focus_calibration", methods=["GET", "POST"])
+def focus_calibration_client_route():
     
-    return render_template("focus_callibration.html", already_started=glob_focus_callibration_started)
+    if request.method == "GET":
+        return render_template("focus_callibration.html")
+    
+    
+    # this is the POST endpoint to callibrate
+    # we receive the timestamp of when the callibration happened on the frontend (in unix time)
+    # and have to match it to the right chunk inside our buffer
+    global glob_buffer, glob_timestamps, glob_sfreq, glob_channel_idxs, expected_sfreq
+    print("received calibration request")
+    
+    data = request.get_json()
+    start_callibration_timestamp = data["calibration_start"]
+    time.sleep(5)
+    
+    if (len(glob_buffer) >= int(glob_sfreq * 86)):  
+        buffer = down_sample_if_needed(glob_buffer, glob_sfreq, expected_sfreq)
+        handle_focus_calibration(buffer, glob_timestamps, expected_sfreq, glob_channel_idxs, start_callibration_timestamp)
+        return {"msg": "succesfully calibrated"}, 200
 
-@app.get("/start_focus_callibration")
-def focus_callibration_route_start():
-    global glob_focus_callibration_started
-    
-    if glob_focus_callibration_started:
-        return jsonify({"msg": "callibration already started"}), 400
-    
     else:
-        glob_focus_callibration_started = True
-        print("\n\n--- starting focus callibration recording ---\n\n")
-        return jsonify({"msg": "callibration started"}), 200
-    
-    
-@app.get("/stop_focus_callibration")
-def focus_callibration_route_stop():
-    global glob_focus_callibration_started
-    
-    if not glob_focus_callibration_started:
-        return jsonify({"msg": "callibration not started"}), 400
-    
-    else:
-        glob_focus_callibration_started = False
-        print("\n\n--- stopping focus callibration recording ---\n\n")
-        return jsonify({"msg": "callibration ended"}), 200
+        return {"msg": "motherfucker is too short"}, 500
+        
+        
+        
+
 
 
 # --- running
@@ -300,5 +300,5 @@ if __name__ == "__main__":
     print("starting webserver")
     app.run(host="127.0.0.1", port=8080, debug=False)
     
-    print("flask exited, closing stream")
+    print("flask exited, closing stream connection")
     stream_info['stop_flag'].set()

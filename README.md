@@ -50,7 +50,7 @@ we need to:
 - 83-86s pause
 this means that all synchronization WITH USER happens on the frontend. the synchronization with the headset stream is done on the backend, using the timestamp (also unix time) provided by the lsl stream.
 - we could map each chunck to a timestep, and then get the closest one to the one received and count from there
-- (not doing, again unprecision) we
+(not a big problem but:) if we leave tap, than the counter pauses, but I think we can expect the user to stay on this bitch for 80s, not that hard
 
 
 ### downsampling

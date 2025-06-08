@@ -26,6 +26,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let unfocusTimerId;
     let circleMovementId;
     let isCalibrating = false;
+    let calibrationStartTime; // Timestamp when actual calibration starts
+    let focusStartTime; // Timestamp when focus phase starts
+    let unfocusStartTime; // Timestamp when unfocus phase starts
     
     // Event listeners
     startBtn.addEventListener('click', startCalibration);
@@ -33,40 +36,32 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Functions
     function startCalibration() {
-        // Send request to start EEG data collection
-        fetch('/start_focus_callibration', {
-            method: 'GET',
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log('Success:', data);
-            
-            // Start the actual calibration process
-            isCalibrating = true;
-            
-            // Hide everything and show only focus task
-            hideAllSections();
-            focusTask.classList.remove('hidden');
-            
-            // Start focus phase after 3 seconds countdown
-            statusText.textContent = 'Starting in 3...';
+        // Start the actual calibration process
+        isCalibrating = true;
+        
+        // Hide everything and show only focus task
+        hideAllSections();
+        focusTask.classList.remove('hidden');
+        
+        // Start focus phase after 3 seconds countdown
+        statusText.textContent = 'Starting in 3...';
+        setTimeout(() => {
+            statusText.textContent = 'Starting in 2...';
             setTimeout(() => {
-                statusText.textContent = 'Starting in 2...';
+                statusText.textContent = 'Starting in 1...';
                 setTimeout(() => {
-                    statusText.textContent = 'Starting in 1...';
-                    setTimeout(() => {
-                        startFocusPhase();
-                    }, 1000);
+                    // Record timestamp when calibration actually starts
+                    calibrationStartTime = Date.now() / 1000; // Convert to seconds for Unix timestamp
+                    startFocusPhase();
                 }, 1000);
             }, 1000);
-        })
-        .catch((error) => {
-            console.error('Error:', error);
-            alert('Failed to start calibration. Please try again.');
-        });
+        }, 1000);
     }
     
     function startFocusPhase() {
+        // Record timestamp when focus phase starts
+        focusStartTime = Date.now() / 1000;
+        
         statusText.textContent = 'Focus on the moving circle!';
         focusTimeRemaining = focusDuration;
         updateFocusTimer();
@@ -111,6 +106,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function startUnfocusPhase() {
+        // Record timestamp when unfocus phase starts
+        unfocusStartTime = Date.now() / 1000;
+        
         unfocusStatusText.textContent = 'Relax your mind...';
         unfocusTimeRemaining = unfocusDuration;
         updateUnfocusTimer();
@@ -132,27 +130,36 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function completeCalibration() {
-        // Send request to stop EEG data collection
-        // fetch('/stop_focus_callibration', {
-        //     method: 'GET',
-        // })
-        // .then(response => response.json())
-        // .then(data => {
-        //     console.log('Success:', data);
-        //     
-        //     // Show results
-        //     hideAllSections();
-        //     results.classList.remove('hidden');
-        //     isCalibrating = false;
-        // })
-        // .catch((error) => {
-        //     console.error('Error:', error);
-        //     alert('Failed to complete calibration. Please try again.');
-        // });
-
-        hideAllSections();
-        results.classList.remove('hidden');
-        isCalibrating = false;
+        // Record timestamp when calibration ends
+        const calibrationEndTime = Date.now() / 1000;
+        
+        // Send timestamps to backend
+        fetch('/focus_calibration', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                calibration_start: calibrationStartTime,
+                focus_start: focusStartTime,
+                focus_end: unfocusStartTime,
+                unfocus_start: unfocusStartTime,
+                unfocus_end: calibrationEndTime
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Calibration data sent successfully:', data);
+            
+            // Show results
+            hideAllSections();
+            results.classList.remove('hidden');
+            isCalibrating = false;
+        })
+        .catch((error) => {
+            console.error('Error sending calibration data:', error);
+            alert('Failed to complete calibration. Please try again.');
+        });
     }
     
     function resetCalibration() {
@@ -206,11 +213,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle page unload to stop calibration if in progress
     window.addEventListener('beforeunload', function(e) {
         if (isCalibrating) {
-            fetch('/stop_focus_callibration', {
-                method: 'GET',
-                keepalive: true
-            });
-            
             // Show confirmation dialog
             e.preventDefault();
             e.returnValue = '';
