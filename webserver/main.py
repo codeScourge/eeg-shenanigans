@@ -4,6 +4,7 @@ import time
 from _models import predict_cogload, predict_focus
 from lsl_read import list_available_lsl_streams, start_eeg_stream
 import numpy as np
+from _helpers import softmax
 from scipy import signal
 import os
 
@@ -11,51 +12,77 @@ import os
 # --- envs
 dotenv.load_dotenv()
 
-
 # --- main handling function
-glob_last_inference:float = time.time()  # return seconds since epoch
-glob_buffer = []
-glob_cogload = 0    # between 0 and 1 (corresponds to 100% and 200% video speed)
-glob_focus = 0  # between 0 and 1 (corresponds to completely drowsy vs full focus)
+started = time.time()
 
 expected_channels = ['F7','F3','P7','O1','O2','P8','F4']
 expected_sfreq = 128  
 
-# - callibration shit
+glob_buffer = []
+glob_channel_idxs = []
+glob_sfreq = 128
+
+
+
+
+# --- callibration shit
 glob_focus_callibration_started = False
 
-def handle_focus_callibration(buffer, channel_idxs):
+def handle_focus_callibration():
     """
     expects an already downsampled buffer with at least 80 seconds filled of expected_sfreq - channel_idxs to identify what is where
     """
-    global glob_focus_callibration_started, expected_sfreq
     
-    focused_buffer = np.array(buffer[int(-expected_sfreq*83):int(-expected_sfreq*43)]).T[channel_idxs]
-    unfocused_buffer = np.array(buffer[int(-expected_sfreq*40):]).T[channel_idxs]
+    global glob_buffer, glob_sfreq, glob_channel_idxs, glob_focus_callibration_started, expected_sfreq
+    
+    
+    buffer = down_sample_if_needed(glob_buffer, glob_sfreq, expected_sfreq)
+    focused_buffer = np.array(buffer[int(-expected_sfreq*83):int(-expected_sfreq*43)]).T[glob_channel_idxs]
+    unfocused_buffer = np.array(buffer[int(-expected_sfreq*40):]).T[glob_channel_idxs]
+    
     print("\n\n--- imagine we just finetune ---\n\n") # TODO finetune 
     np.save("./datasets/focused.npy", focused_buffer)
     np.save("./datasets/unfocused.npy", unfocused_buffer)
     
     glob_focus_callibration_started = False
     
-    
 
-# - 
-def softmax(x):
-    exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))
-    return exp_x / np.sum(exp_x, axis=1, keepdims=True)
 
+
+# --- downsampling shit
 minimum_displayed_freq = 0.5    # in Hz
 minimum_length_for_downsampling = 10 * (1 / minimum_displayed_freq)    # 20 seconds, has to be multiplied by the frequency to get the actual time steps
+    
+def down_sample_if_needed(input_buffer, source_sfreq, target_sfreq):
+    """
+    needs certain length and must be higher than target sfreq
+    
+    """
 
-def down_sample(buffer, source_sfreq:float):
+    if source_sfreq < target_sfreq:
+        raise Exception(f"{source_sfreq} is smaller than target sfreq of {target_sfreq}")
+    
+    
+    # no need if same
+    if source_sfreq == target_sfreq:
+        return input_buffer
+    
+    
+    # check if minimum length on nyqiom theorem has been reached
+    if len(input_buffer) >= (minimum_length_for_downsampling * source_sfreq):
+        return down_sample(input_buffer, source_sfreq, target_sfreq)
+    
+    else:
+        print(f"{len(glob_buffer) / glob_sfreq} seconds too short for downsample, skipping...")
+        return None
+
+
+def down_sample(buffer, source_sfreq:float, target_sfreq:float):
     """
     takes:
     - buffer of shape (n_channels, n_samples) - n_samples has to be at least minimum_length_for_downsampling (otherwise not accurate, or might even throw error because impossible)
     - source_sfreq - lower than the target_sfeq defined in "expected_sfreq" global variable
     """
-    
-    target_sfreq = expected_sfreq
     
     if source_sfreq <= target_sfreq:
         raise Exception(f"source frequency {source_sfreq} must be higher than the target frequency of {target_sfreq}")
@@ -86,89 +113,27 @@ def down_sample(buffer, source_sfreq:float):
     # print(f"downsampled in: {(end - start) * 1000:.3f} ms")
     return output_buffer
 
-# - passed to subthread
-def handle_eeg(sample, sfreq:float, real_channels:list):
-    global glob_last_inference, glob_cogload, glob_focus, glob_buffer
-    global glob_focus_callibration_started
+
+# --- main handling function, passed to subthread
+def handle_eeg(sample):
+    global glob_focus_callibration_started, glob_buffer, glob_sfreq
+    
     
     # --- constantly append to buffer global variable, holding up to 180s (sliding window)
     glob_buffer.append(sample)
 
-    if len(glob_buffer) > (sfreq * 180):
-        glob_buffer[:] = glob_buffer[-(int(sfreq * 180)):]
+    if len(glob_buffer) > (glob_sfreq * 180):
+        glob_buffer[:] = glob_buffer[-(int(glob_sfreq * 180)):]
 
         
-        
-    # --- run inference only every half second max
-    if (time.time() - glob_last_inference) < 0.5:
-        return
     
-    glob_last_inference = time.time()
-    
-    
-    # --- EEG channels
-    # handle shitty openbci stream
-    if real_channels == ['', '', '', '', '', '', '', '']:
-        real_channels = ['F7','F3','P7','O1','O2','P8','F4']
-    
-    # check if all expected channels exist (we can have more than needed, no problem)
-    channel_idxs=[]
-    for channel in expected_channels:
-        if channel in real_channels:
-            channel_idxs.append(real_channels.index(channel))
-        else:
-            raise Exception(f"{channel} missing in real_channels: {real_channels}")
-        
-        
-    # --- at this point we (if needed) downsample, means that our measurements on the (not global) buffer object need to use expected_sfreq
-    if sfreq < expected_sfreq:
-        raise Exception(f"{sfreq} is smaller than expected sfreq of {expected_sfreq}")
-    elif sfreq > expected_sfreq:
-        
-        # skip if not ong enough to downsample
-        if len(glob_buffer) >= (minimum_length_for_downsampling * sfreq):
-            buffer = down_sample(glob_buffer, sfreq)
-        else:
-            print(f"{len(glob_buffer) / sfreq} seconds too short for downsample, skipping...")
-            return
-    else:
-        buffer = glob_buffer
-        
-        
     # --- when finetuning: and we have reached the 80s data collection time, handle the finetuning step
-    if glob_focus_callibration_started and (len(buffer) >= int(expected_sfreq * 86)):
-        handle_focus_callibration(buffer, channel_idxs)
-    else:
-        print(glob_focus_callibration_started)
-        print(len(buffer), ">", int(expected_sfreq * 86))
-        
-    # --- skipping last channel
-    # 4 seconds needed for cogload
-    if len(buffer) >= (expected_sfreq * 4):
-        start = time.perf_counter()
-        data = np.array(buffer[int(-expected_sfreq*4):]).T[channel_idxs]
-        
-        logits = predict_cogload(data, expected_sfreq)
-        probs = softmax(logits)
-        
-        glob_cogload = probs[0][1]
-        
-        end = time.perf_counter()
-        # print(f"predicted cognitive load {probs[0][1]} (1=high) in: {(end - start) * 1000:.3f} ms")
+    if glob_focus_callibration_started and (len(glob_buffer) >= int(glob_sfreq * 86)):
+        handle_focus_callibration()
+    # else:
+        # TODO: switch to something with timestamps, this bitch is still shifting
+        # print(f"started {time.time() - started} seconds ago, so far only {len(glob_buffer) / glob_sfreq}")
     
-    # 15 seconds needed for focus
-    if len(buffer) >= (expected_sfreq * 15):
-        start = time.perf_counter()
-
-        data = np.array(buffer[int(-expected_sfreq*15):]).T[channel_idxs]
-        
-        prob = predict_focus(data, expected_sfreq)
-        pred = prob >= 0.5
-        
-        glob_focus = prob
-        
-        end = time.perf_counter()
-        # print(f"predicted focus {pred} ({prob}% of it being focused) in: {(end - start) * 1000:.3f} ms")
 
 # --- init
 app = Flask(__name__)
@@ -178,11 +143,52 @@ app = Flask(__name__)
 # --- routes
 @app.get("/data")
 def dataRoute():
-    global glob_cogload, glob_focus
+    global glob_buffer, glob_channel_idxs, glob_sfreq
+    
+    if len(glob_buffer) < glob_sfreq*15:
+        print("--not long enough for inference inference--")
+        return jsonify({
+            "cogload": str(0),
+            "focus": str(0)
+        })
+    
+    
+    buffer = down_sample_if_needed(glob_buffer, glob_sfreq, expected_sfreq)
+    if buffer == None:
+        print("--not long enough for downsampling--")
+        return jsonify({
+            "cogload": str(0),
+            "focus": str(0)
+        })
+    
+    # --- needs 15 seconds
+    start = time.perf_counter()
+
+    data = np.array(buffer[int(-expected_sfreq*15):]).T[glob_channel_idxs]
+    
+    prob = predict_focus(data, expected_sfreq)
+    pred = prob >= 0.5
+    
+    focus = prob
+    
+    end = time.perf_counter()
+    # print(f"predicted focus {pred} ({prob}% of it being focused) in: {(end - start) * 1000:.3f} ms")
+        
+    # --- needs 4 seconds
+    start = time.perf_counter()
+    data = np.array(buffer[int(-expected_sfreq*4):]).T[glob_channel_idxs]
+    
+    logits = predict_cogload(data, expected_sfreq)
+    probs = softmax(logits)
+    
+    cogload = probs[0][1]
+    
+    end = time.perf_counter()
+    # print(f"predicted cognitive load {probs[0][1]} (1=high) in: {(end - start) * 1000:.3f} ms")
     
     return jsonify({
-        "cogload": str(glob_cogload),
-        "focus": str(glob_focus)
+        "cogload": str(cogload), # between 0 and 1 (corresponds to 100% and 200% video speed)
+        "focus": str(focus) # between 0 and 1 (corresponds to completely drowsy vs full focus)
     })
     
 @app.get("/")
@@ -256,6 +262,25 @@ if __name__ == "__main__":
 
     stream_idx = int(input("Enter the number of the stream you want to capture: ")) - 1
     stream_info = start_eeg_stream(stream_idx, handle_eeg=handle_eeg, max_rate=128)
+    
+    
+    # --
+    glob_sfreq = stream_info["sfreq"]
+    ch_names = stream_info["ch_names"]
+    
+    if ch_names == ['', '', '', '', '', '', '', '']:
+        ch_names = ['F7','F3','P7','O1','O2','P8','F4']
+    
+    # check if all expected channels exist (we can have more than needed, no problem - will be filtered out by the use of indexes)
+    channel_idxs=[]
+    for channel in expected_channels:
+        if channel in ch_names:
+            channel_idxs.append(ch_names.index(channel))
+        else:
+            raise Exception(f"{channel} missing in real_channels: {ch_names}")
+    # --
+    
+    
     print("\n\n--- info about stream ---")
     print(stream_info)
     print("-------------------------\n\n")

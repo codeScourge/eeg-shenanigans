@@ -36,17 +36,21 @@ focus: [![Open STEW In Colab](https://colab.research.google.com/assets/colab-bad
 - for now it will simply overwrite the old finetuned model each time
 
 we need to:
+```old
 - collect a 40s clip (32s train, 8s test) for each state (focused, unfocused)
 - either record it on the backend in a separate object..
 - ... OR: record a timestamp which you can pull from the buffer? (basically we just have to send an end-request to the backend which is precise in how many timebins the recorded started ago - means full synchronization frontend backnend OR include a time-string, but this would require the buffer to be saved with times as well)
 - => the first one is easier, simply call a start signal at the same time the person is asked to focus, then after 40s*128Hz items, we end the collection and then finetune this shit
 - the question is how to make the client... insipired by eyetracking being used for annotation: 
-
-
-=> but the time will be the following: last:
+```
+=> new is done using timestamp, because otherwise it is unprecise AF, this means we get the timestamp of the start in unix time in the frontend, and then after callibration is done there, we send it to an endpoint to get the last 86 seconds, since:
 - 0-40s unfocused
 - 40-43s pause
 - 43-83s focused
 - 83-86s pause
+this means that all synchronization WITH USER happens on the frontend. the synchronization with the headset stream is done on the backend, using the timestamp (also unix time) provided by the lsl stream.
+- we could map each chunck to a timestep, and then get the closest one to the one received and count from there
+- (not doing, again unprecision) we
+
 
 ### downsampling

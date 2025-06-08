@@ -54,24 +54,30 @@ def start_eeg_stream(stream_index, handle_eeg=None, max_rate=128):
 
     def streaming_thread():
         # Calculate time between samples to limit to max_rate
-        min_time_between_samples = 1.0 / max_rate
-        last_sample_time = time.time()
+        # min_time_between_samples = 1.0 / max_rate
+        # last_sample_time = time.time()
         
-        while not stop_flag.is_set():
-            current_time = time.time()
-            elapsed = current_time - last_sample_time
+        # while not stop_flag.is_set():
+        #     current_time = time.time()
+        #     elapsed = current_time - last_sample_time
             
-            # only sample (from lsl) at a max freq of provided max_rate (which in theory should be the same as our headset sfreq)
-            if elapsed >= min_time_between_samples:
-                sample, timestamp = inlet.pull_sample(timeout=0.0)
+        #     # only sample (from lsl) at a max freq of provided max_rate (which in theory should be the same as our headset sfreq)
+        #     if elapsed >= min_time_between_samples:
+        #         sample, timestamp = inlet.pull_sample(timeout=0.0)
                 
-                if sample and handle_eeg:
-                    handle_eeg(sample, sfreq, ch_names)
-                    last_sample_time = current_time
-            else:
-                # Sleep a bit to avoid consuming too much CPU
-                time.sleep(0.001)
-  
+        #         if sample and handle_eeg:
+        #             handle_eeg(sample, sfreq, ch_names)
+        #             last_sample_time = current_time
+        #     else:
+        #         # Sleep a bit to avoid consuming too much CPU
+        #         time.sleep(0.001)
+               
+        while not stop_flag.is_set():
+            sample, timestamp = inlet.pull_sample(timeout=0.0)
+            if sample:
+                handle_eeg(sample)
+            time.sleep(0.001)
+    
   
     thread = threading.Thread(target=streaming_thread)
     thread.daemon = True
