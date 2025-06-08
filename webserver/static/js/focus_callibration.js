@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const unfocusTask = document.getElementById('unfocusTask');
     const results = document.getElementById('results');
     const statusText = document.getElementById('statusText');
+    const unfocusStatusText = document.getElementById('unfocusStatusText');
     const targetCircle = document.getElementById('targetCircle');
     const progress = document.getElementById('progress');
     const timer = document.getElementById('timer');
@@ -35,9 +36,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // Send request to start EEG data collection
         fetch('/start_focus_callibration', {
             method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-            },
         })
         .then(response => response.json())
         .then(data => {
@@ -45,7 +43,9 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Start the actual calibration process
             isCalibrating = true;
-            instructions.classList.add('hidden');
+            
+            // Hide everything and show only focus task
+            hideAllSections();
             focusTask.classList.remove('hidden');
             
             // Start focus phase after 3 seconds countdown
@@ -87,16 +87,31 @@ document.addEventListener('DOMContentLoaded', function() {
             if (focusTimeRemaining <= 0) {
                 clearInterval(focusTimerId);
                 clearInterval(circleMovementId);
-                startUnfocusPhase();
+                transitionToUnfocusPhase();
             }
         }, 1000);
     }
     
-    function startUnfocusPhase() {
-        // Hide focus task and show unfocus task
-        focusTask.classList.add('hidden');
+    function transitionToUnfocusPhase() {
+        // Hide everything and show only unfocus task
+        hideAllSections();
         unfocusTask.classList.remove('hidden');
         
+        // Start unfocus phase after 3 seconds countdown
+        unfocusStatusText.textContent = 'Next phase starting in 3...';
+        setTimeout(() => {
+            unfocusStatusText.textContent = 'Next phase starting in 2...';
+            setTimeout(() => {
+                unfocusStatusText.textContent = 'Next phase starting in 1...';
+                setTimeout(() => {
+                    startUnfocusPhase();
+                }, 1000);
+            }, 1000);
+        }, 1000);
+    }
+    
+    function startUnfocusPhase() {
+        unfocusStatusText.textContent = 'Relax your mind...';
         unfocusTimeRemaining = unfocusDuration;
         updateUnfocusTimer();
         
@@ -118,35 +133,43 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function completeCalibration() {
         // Send request to stop EEG data collection
-        fetch('/start_focus_callibration', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ action: 'stop' }),
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log('Success:', data);
-            
-            // Show results
-            unfocusTask.classList.add('hidden');
-            results.classList.remove('hidden');
-            isCalibrating = false;
-        })
-        .catch((error) => {
-            console.error('Error:', error);
-            alert('Failed to complete calibration. Please try again.');
-        });
+        // fetch('/stop_focus_callibration', {
+        //     method: 'GET',
+        // })
+        // .then(response => response.json())
+        // .then(data => {
+        //     console.log('Success:', data);
+        //     
+        //     // Show results
+        //     hideAllSections();
+        //     results.classList.remove('hidden');
+        //     isCalibrating = false;
+        // })
+        // .catch((error) => {
+        //     console.error('Error:', error);
+        //     alert('Failed to complete calibration. Please try again.');
+        // });
+
+        hideAllSections();
+        results.classList.remove('hidden');
+        isCalibrating = false;
     }
     
     function resetCalibration() {
-        results.classList.add('hidden');
+        hideAllSections();
         instructions.classList.remove('hidden');
         
         // Reset progress bars
         progress.style.width = '0%';
         unfocusProgress.style.width = '0%';
+    }
+    
+    // Helper function to hide all sections
+    function hideAllSections() {
+        instructions.classList.add('hidden');
+        focusTask.classList.add('hidden');
+        unfocusTask.classList.add('hidden');
+        results.classList.add('hidden');
     }
     
     function moveCircle() {
@@ -183,12 +206,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle page unload to stop calibration if in progress
     window.addEventListener('beforeunload', function(e) {
         if (isCalibrating) {
-            fetch('/start_focus_callibration', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ action: 'cancel' }),
+            fetch('/stop_focus_callibration', {
+                method: 'GET',
                 keepalive: true
             });
             

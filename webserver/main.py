@@ -24,11 +24,17 @@ expected_sfreq = 128
 # - callibration shit
 glob_focus_callibration_started = False
 
-def handle_focus_callibration(sfreq):
-    global glob_focus_callibration_started, glob_buffer
+def handle_focus_callibration(buffer, channel_idxs):
+    """
+    expects an already downsampled buffer with at least 80 seconds filled of expected_sfreq - channel_idxs to identify what is where
+    """
+    global glob_focus_callibration_started, expected_sfreq
     
-    buffer = glob_buffer[-sfreq*80:]
+    focused_buffer = np.array(buffer[int(-expected_sfreq*83):int(-expected_sfreq*43)]).T[channel_idxs]
+    unfocused_buffer = np.array(buffer[int(-expected_sfreq*40):]).T[channel_idxs]
     print("\n\n--- imagine we just finetune ---\n\n") # TODO finetune 
+    np.save("./datasets/focused.npy", focused_buffer)
+    np.save("./datasets/unfocused.npy", unfocused_buffer)
     
     glob_focus_callibration_started = False
     
@@ -72,12 +78,12 @@ def down_sample(buffer, source_sfreq:float):
     
     downsampled_data = signal.resample(filtered_data, new_length, axis=1)
     
-    print(f"reduced length of samples from {buffer.shape[1]} to {downsampled_data.shape[1]} (should be a down_factor of {down_factor})")
+    print(f"reduced length of samples from {buffer.shape[1]} to {downsampled_data.shape[1]}")
     
     output_buffer = downsampled_data.T.tolist()
     
     end = time.perf_counter()
-    print(f"downsampled in: {(end - start) * 1000:.3f} ms")
+    # print(f"downsampled in: {(end - start) * 1000:.3f} ms")
     return output_buffer
 
 # - passed to subthread
@@ -91,10 +97,6 @@ def handle_eeg(sample, sfreq:float, real_channels:list):
     if len(glob_buffer) > (sfreq * 180):
         glob_buffer[:] = glob_buffer[-(int(sfreq * 180)):]
 
-
-    # --- when finetuning: and we have reached the 80s data collection time, handle the finetuning step
-    if glob_focus_callibration_started and (len(glob_buffer) >= int(sfreq * 80)):
-        handle_focus_callibration()
         
         
     # --- run inference only every half second max
@@ -132,6 +134,14 @@ def handle_eeg(sample, sfreq:float, real_channels:list):
     else:
         buffer = glob_buffer
         
+        
+    # --- when finetuning: and we have reached the 80s data collection time, handle the finetuning step
+    if glob_focus_callibration_started and (len(buffer) >= int(expected_sfreq * 86)):
+        handle_focus_callibration(buffer, channel_idxs)
+    else:
+        print(glob_focus_callibration_started)
+        print(len(buffer), ">", int(expected_sfreq * 86))
+        
     # --- skipping last channel
     # 4 seconds needed for cogload
     if len(buffer) >= (expected_sfreq * 4):
@@ -144,7 +154,7 @@ def handle_eeg(sample, sfreq:float, real_channels:list):
         glob_cogload = probs[0][1]
         
         end = time.perf_counter()
-        print(f"predicted cognitive load {probs[0][1]} (1=high) in: {(end - start) * 1000:.3f} ms")
+        # print(f"predicted cognitive load {probs[0][1]} (1=high) in: {(end - start) * 1000:.3f} ms")
     
     # 15 seconds needed for focus
     if len(buffer) >= (expected_sfreq * 15):
@@ -158,7 +168,7 @@ def handle_eeg(sample, sfreq:float, real_channels:list):
         glob_focus = prob
         
         end = time.perf_counter()
-        print(f"predicted focus {pred} ({prob}% of it being focused) in: {(end - start) * 1000:.3f} ms")
+        # print(f"predicted focus {pred} ({prob}% of it being focused) in: {(end - start) * 1000:.3f} ms")
 
 # --- init
 app = Flask(__name__)
@@ -223,7 +233,7 @@ def focus_callibration_route_start():
         return jsonify({"msg": "callibration started"}), 200
     
     
-@app.post("/start_focus_callibration")
+@app.get("/stop_focus_callibration")
 def focus_callibration_route_stop():
     global glob_focus_callibration_started
     

@@ -41,11 +41,12 @@ we need to:
 - ... OR: record a timestamp which you can pull from the buffer? (basically we just have to send an end-request to the backend which is precise in how many timebins the recorded started ago - means full synchronization frontend backnend OR include a time-string, but this would require the buffer to be saved with times as well)
 - => the first one is easier, simply call a start signal at the same time the person is asked to focus, then after 40s*128Hz items, we end the collection and then finetune this shit
 - the question is how to make the client... insipired by eyetracking being used for annotation: 
-```prompt
-I need an interface for building an EEG dataset. basically I try to to first make the user focus hard (by having him follow a flying circle on screen?) and then be unfocused (by showing a blurred focused?)
 
----
 
-can you write me the html, css, js files for that? (filename for all should be focus_callibration)
-```
+=> but the time will be the following: last:
+- 0-40s unfocused
+- 40-43s pause
+- 43-83s focused
+- 83-86s pause
 
+### downsampling
