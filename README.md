@@ -52,5 +52,10 @@ this means that all synchronization WITH USER happens on the frontend. the synch
 - we could map each chunck to a timestep, and then get the closest one to the one received and count from there
 (not a big problem but:) if we leave tap, than the counter pauses, but I think we can expect the user to stay on this bitch for 80s, not that hard
 
+##### matching clocks
+the problem is, that the return of the LSL stream is not unix time, but a local device clock
+- we can calculate an offset between the two (f.e take first timestep, or keep a moving average) and then append it -
+- however the above would include the delay between when it was recorded and when it actually arrived on the backend - ideal would be "advanced clock synchronization" - f.e. send time since last timestamp sent so we can calculate out the
 
 ### downsampling
+idk I just did

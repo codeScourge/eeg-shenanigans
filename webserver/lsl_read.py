@@ -1,7 +1,11 @@
 import numpy as np
-from pylsl import StreamInlet, resolve_streams
+from pylsl import StreamInlet, resolve_streams, local_clock
 import time
 import threading
+import time
+
+
+conversion = time.time() - local_clock()  
 
 
 def list_available_lsl_streams():
@@ -28,6 +32,7 @@ def start_eeg_stream(stream_index, handle_eeg=None, max_rate=128):
     # -- handling
     inlet = StreamInlet(streams[0])
     info = inlet.info()
+    print(info)
     sfreq = info.nominal_srate()
     ch_count = info.channel_count()
     ch_names = []
@@ -72,10 +77,15 @@ def start_eeg_stream(stream_index, handle_eeg=None, max_rate=128):
         #         # Sleep a bit to avoid consuming too much CPU
         #         time.sleep(0.001)
                
+        time_correction = inlet.time_correction()
+               
         while not stop_flag.is_set():
             sample, timestamp = inlet.pull_sample(timeout=0.0)
+            
             if sample:
+                timestamp = timestamp + time_correction + conversion
                 handle_eeg(sample, timestamp)
+                
             time.sleep(0.001)
     
   

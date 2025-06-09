@@ -15,8 +15,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const unfocusTimer = document.getElementById('unfocusTimer');
     
     // Configuration
-    const focusDuration = 40; // seconds
-    const unfocusDuration = 40; // seconds
+    const focusDuration = 10; // seconds
+    const unfocusDuration = 10; // seconds
     const circleMovementInterval = 2000; // milliseconds
     
     // Variables

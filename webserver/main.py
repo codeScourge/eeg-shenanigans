@@ -37,10 +37,10 @@ def handle_focus_calibration(buffer:list, timestamps:list, sfreq:float, channel_
     # 43-46s pause
     # 46-86s unfocused
     start_index = find_closest_timestamp_index(timestamps, start_callibration_timestamp)
-    f_start = start_index+(3*sfreq)
-    f_end = start_index+(43*sfreq)
-    u_start = start_index+(46*sfreq)
-    u_end = start_index+(86*sfreq)
+    f_start = start_index + (3*sfreq)
+    f_end = start_index + (13*sfreq)
+    u_start = start_index + (16*sfreq)
+    u_end = start_index + (26*sfreq)
     
     focused_buffer = np.array(buffer[f_start:f_end]).T[channel_idxs]
     unfocused_buffer = np.array(buffer[u_start:u_end]).T[channel_idxs]
@@ -48,6 +48,7 @@ def handle_focus_calibration(buffer:list, timestamps:list, sfreq:float, channel_
     print("\n\n--- imagine we just finetune ---\n\n") # TODO finetune 
     np.save("./datasets/focused.npy", focused_buffer)
     np.save("./datasets/unfocused.npy", unfocused_buffer)
+    print(f"saving shapes: {focused_buffer.shape}, {unfocused_buffer.shape}")
     
     
 
@@ -57,7 +58,7 @@ def handle_focus_calibration(buffer:list, timestamps:list, sfreq:float, channel_
 minimum_displayed_freq = 0.5    # in Hz
 minimum_length_for_downsampling = 10 * (1 / minimum_displayed_freq)    # 20 seconds, has to be multiplied by the frequency to get the actual time steps
     
-def down_sample_if_needed(input_buffer, source_sfreq, target_sfreq):
+def down_sample_if_needed(input_buffer, source_sfreq, target_sfreq, timestamps=None):
     """
     needs certain length and must be higher than target sfreq
     
@@ -69,12 +70,23 @@ def down_sample_if_needed(input_buffer, source_sfreq, target_sfreq):
     
     # no need if same
     if source_sfreq == target_sfreq:
-        return input_buffer
+        return input_buffer, timestamps
     
     
     # check if minimum length on nyqiom theorem has been reached
     if len(input_buffer) >= (minimum_length_for_downsampling * source_sfreq):
-        return down_sample(input_buffer, source_sfreq, target_sfreq)
+        downsampled_buffer = down_sample(input_buffer, source_sfreq, target_sfreq)
+        
+        # -- downsample timestamps simply by skipping (TODO: could pool them)
+        downsample_factor = source_sfreq / target_sfreq
+        indices_to_keep = []
+        for i in range(int(len(timestamps) / downsample_factor)):
+            idx = int(i * downsample_factor)
+            if idx < len(timestamps):
+                indices_to_keep.append(idx)
+        downsampled_timestamps = [timestamps[i] for i in indices_to_keep]
+        
+        return downsampled_buffer, downsampled_timestamps
     
     else:
         print(f"{len(glob_buffer) / glob_sfreq} seconds too short for downsample, skipping...")
@@ -127,6 +139,8 @@ def handle_eeg(sample, timestamp):
     
     global glob_buffer, glob_sfreq, glob_timestamps
     
+    # print(timestamp)
+    
     # --- constantly append to buffer global variable (sliding window)
     glob_buffer.append(sample)
     glob_timestamps.append(timestamp)
@@ -155,7 +169,7 @@ def dataRoute():
         })
     
     
-    buffer = down_sample_if_needed(glob_buffer, glob_sfreq, expected_sfreq)
+    buffer, _ = down_sample_if_needed(glob_buffer, glob_sfreq, expected_sfreq)
     if buffer == None:
         print("--not long enough for downsampling--")
         return jsonify({
@@ -239,9 +253,9 @@ def focus_calibration_client_route():
     start_callibration_timestamp = data["calibration_start"]
     time.sleep(5)
     
-    if (len(glob_buffer) >= int(glob_sfreq * 86)):  
-        buffer = down_sample_if_needed(glob_buffer, glob_sfreq, expected_sfreq)
-        handle_focus_calibration(buffer, glob_timestamps, expected_sfreq, glob_channel_idxs, start_callibration_timestamp)
+    if (len(glob_buffer) >= int(glob_sfreq * 26)):  
+        buffer, timestamps = down_sample_if_needed(glob_buffer, glob_sfreq, expected_sfreq, glob_timestamps)
+        handle_focus_calibration(buffer, timestamps, expected_sfreq, glob_channel_idxs, start_callibration_timestamp)
         return {"msg": "succesfully calibrated"}, 200
 
     else:
@@ -272,10 +286,9 @@ if __name__ == "__main__":
         ch_names = ['F7','F3','P7','O1','O2','P8','F4']
     
     # check if all expected channels exist (we can have more than needed, no problem - will be filtered out by the use of indexes)
-    channel_idxs=[]
     for channel in expected_channels:
         if channel in ch_names:
-            channel_idxs.append(ch_names.index(channel))
+            glob_channel_idxs.append(ch_names.index(channel))
         else:
             raise Exception(f"{channel} missing in real_channels: {ch_names}")
     # --

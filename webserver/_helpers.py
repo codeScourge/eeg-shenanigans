@@ -4,7 +4,7 @@ def softmax(x):
 
 
 
-def find_closest_timestamp_index(timestamps, target_timestamp):
+def find_closest_timestamp_index(timestamps:list, target_timestamp):
     """
     Finds the index of the closest timestamp to the target timestamp.
     Uses binary search for efficiency.
@@ -26,6 +26,7 @@ def find_closest_timestamp_index(timestamps, target_timestamp):
     if target_timestamp <= timestamps[0]:
         return 0
     if target_timestamp >= timestamps[-1]:
+        print(f"timestep {target_timestamp} received from frontend, is bigger than the latest timestamp {timestamps[-1]}")
         return len(timestamps) - 1
     
     # Binary search
