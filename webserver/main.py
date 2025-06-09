@@ -38,9 +38,9 @@ def handle_focus_calibration(buffer:list, timestamps:list, sfreq:float, channel_
     # 46-86s unfocused
     start_index = find_closest_timestamp_index(timestamps, start_callibration_timestamp)
     f_start = start_index + (3*sfreq)
-    f_end = start_index + (13*sfreq)
-    u_start = start_index + (16*sfreq)
-    u_end = start_index + (26*sfreq)
+    f_end = start_index + (43*sfreq)
+    u_start = start_index + (46*sfreq)
+    u_end = start_index + (86*sfreq)
     
     focused_buffer = np.array(buffer[f_start:f_end]).T[channel_idxs]
     unfocused_buffer = np.array(buffer[u_start:u_end]).T[channel_idxs]
@@ -253,7 +253,7 @@ def focus_calibration_client_route():
     start_callibration_timestamp = data["calibration_start"]
     time.sleep(5)
     
-    if (len(glob_buffer) >= int(glob_sfreq * 26)):  
+    if (len(glob_buffer) >= int(glob_sfreq * 86)):  
         buffer, timestamps = down_sample_if_needed(glob_buffer, glob_sfreq, expected_sfreq, glob_timestamps)
         handle_focus_calibration(buffer, timestamps, expected_sfreq, glob_channel_idxs, start_callibration_timestamp)
         return {"msg": "succesfully calibrated"}, 200
