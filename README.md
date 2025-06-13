@@ -24,6 +24,7 @@ cogload using STEW: [![Open STEW In Colab](https://colab.research.google.com/ass
 ---
 
 focus: [![Open STEW In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/codeScourge/eeg-shenanigans/blob/main/train_focus.ipynb)
+https://www.sciencedirect.com/science/article/abs/pii/S0957417419303926
 - 80% focused, 58% whole
 
 ### setup

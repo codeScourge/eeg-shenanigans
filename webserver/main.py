@@ -223,6 +223,7 @@ def home_route():
     </nav>
     <nav>
         <a href="/focus_calibration">Focus callibration client</a>
+        <a href="/cogload_calibration">Cogload callibration client</a>
     </nav>
 </body>
 </html>              
@@ -240,7 +241,7 @@ def focus_route():
 def focus_calibration_client_route():
     
     if request.method == "GET":
-        return render_template("focus_callibration.html")
+        return render_template("focus_calibration.html")
     
     
     # this is the POST endpoint to callibrate
@@ -262,7 +263,17 @@ def focus_calibration_client_route():
         return {"msg": "motherfucker is too short"}, 500
         
         
-        
+@app.route("/cogload_calibration", methods=["GET", "POST"])
+def cogload_calibration_client_route():
+    
+    if request.method == "GET":
+        return render_template("cogload_calibration.html")
+    
+    
+    data = request.get_json()
+    print(data)
+    return {"msg": "succesfully calibrated"}, 200
+    
 
 
 

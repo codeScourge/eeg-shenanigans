@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cognitive Load Calibration</title>
+    <link rel="stylesheet" href="/static/css/cogload_calibration.css">
+</head>
+<body>
+    <div class="container">
+        <div id="start-screen">
+            <h1>Cognitive Load Calibration</h1>
+            <p>You will watch 10 video clips and provide feedback after each one.</p>
+            <button id="start-button">Start</button>
+        </div>
+
+        <div id="countdown-screen" class="hidden">
+            <h2 id="countdown-text">Starting in 3...</h2>
+        </div>
+
+        <div id="video-screen" class="hidden">
+            <p class="instruction">Try actively to understand the content, listen in whether you could handle faster speed</p>
+            <video id="video-player" width="640" height="360" controls="false"></video>
+        </div>
+
+        <div id="feedback-screen" class="hidden">
+            <p class="instruction">The goal is to be at the optimal level of learning - fast as possible while understanding everything - it is supposed to be hard and require full attention</p>
+            <div class="buttons">
+                <button id="stay-button">Stay</button>
+                <button id="faster-button">Faster</button>
+                <button id="slower-button">Slower</button>
+                <button id="explain-button">Give Explanation</button>
+            </div>
+        </div>
+
+        <div id="results-screen" class="hidden">
+            <h2>Calibration Complete</h2>
+            <p>Thank you for completing the calibration.</p>
+            <pre id="results-data"></pre>
+        </div>
+    </div>
+    <script src="/static/js/cogload_calibration.js"></script>
+</body>
+</html>
