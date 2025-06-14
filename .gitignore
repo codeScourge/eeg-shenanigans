@@ -205,6 +205,5 @@ dist-ssr
 
 
 # ---
-models
-data
-/webserver/static/videos
+/webserver/static/videos/*.mp4
+/webserver/collected_data/*.npy

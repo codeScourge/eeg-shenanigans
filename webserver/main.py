@@ -30,12 +30,15 @@ glob_sfreq = 128
 def handle_focus_calibration(buffer:list, timestamps:list, sfreq:float, channel_idxs:list, start_callibration_timestamp:float):
     """
     expects an already downsampled buffer with at least 86 seconds filled of expected_sfreq - channel_idxs to identify what is where
-    """
     
+    only expects start of calibration, everything else can be calculated
     # 0-3s pause
     # 3-43s focused
     # 43-46s pause
     # 46-86s unfocused
+    """
+    
+
     start_index = find_closest_timestamp_index(timestamps, start_callibration_timestamp)
     f_start = start_index + (3*sfreq)
     f_end = start_index + (43*sfreq)
@@ -45,13 +48,29 @@ def handle_focus_calibration(buffer:list, timestamps:list, sfreq:float, channel_
     focused_buffer = np.array(buffer[f_start:f_end]).T[channel_idxs]
     unfocused_buffer = np.array(buffer[u_start:u_end]).T[channel_idxs]
     
-    print("\n\n--- imagine we just finetune ---\n\n") # TODO finetune 
-    np.save("./datasets/focused.npy", focused_buffer)
-    np.save("./datasets/unfocused.npy", unfocused_buffer)
-    print(f"saving shapes: {focused_buffer.shape}, {unfocused_buffer.shape}")
+    base_dir = "./collected_data/focus"
+    idx = len([fname for fname in os.listdir() if (fname.endswith(".npy"))])
+    np.save(f"{base_dir}/{idx}_focused.npy", focused_buffer)
+    np.save(f"{base_dir}/{idx}_unfocused.npy", unfocused_buffer)
+    print(f"--- saving shapes: {focused_buffer.shape}, {unfocused_buffer.shape}")
     
     
-
+def handle_cogload_calibration(buffer:list, timestamps:list, sfreq:float, channel_idxs:list, clips_infos:list):
+    """
+    array with item for each clip, holding unix-time of its start (end can be calculated) and its label
+    """
+    
+    for i, clip_info in enumerate(clips_infos):
+        start_index = find_closest_timestamp_index(timestamps, clip_info["start_time"])
+        end_index = start_index + (sfreq*30) # match the frontend, since each clip is shown this many seconds
+        label = clip_info["answer"]
+        clip_buffer = np.array(buffer[start_index:end_index]).T[channel_idxs]
+        
+        
+        base_dir = "./collected_data/cogload"
+        idx = len([fname for fname in os.listdir() if (fname.endswith(".npy"))])
+        np.save(f"{base_dir}/{idx}_{label}.npy", clip_buffer)
+        print(f"--- saving shape: {clip_buffer.shape}")
 
 
 # --- downsampling shit
@@ -252,16 +271,14 @@ def focus_calibration_client_route():
     
     data = request.get_json()
     start_callibration_timestamp = data["calibration_start"]
-    time.sleep(5)
+    time.sleep(2)
     
-    if (len(glob_buffer) >= int(glob_sfreq * 86)):  
-        buffer, timestamps = down_sample_if_needed(glob_buffer, glob_sfreq, expected_sfreq, glob_timestamps)
-        handle_focus_calibration(buffer, timestamps, expected_sfreq, glob_channel_idxs, start_callibration_timestamp)
-        return {"msg": "succesfully calibrated"}, 200
+    
+    # must be len(glob_buffer) >= int(glob_sfreq * 86)
+    buffer, timestamps = down_sample_if_needed(glob_buffer, glob_sfreq, expected_sfreq, glob_timestamps)
+    handle_focus_calibration(buffer, timestamps, expected_sfreq, glob_channel_idxs, start_callibration_timestamp)
+    return {"msg": "succesfully calibrated"}, 200
 
-    else:
-        return {"msg": "motherfucker is too short"}, 500
-        
         
 @app.route("/cogload_calibration", methods=["GET", "POST"])
 def cogload_calibration_client_route():
@@ -270,8 +287,15 @@ def cogload_calibration_client_route():
         return render_template("cogload_calibration.html")
     
     
-    data = request.get_json()
-    print(data)
+    # unix time - "stay", "faster", "slower", "explanation"
+    # [{"start_time": ..., "answer": ...}]
+    
+    clips_infos = request.get_json()
+    print(clips_infos)
+    
+    buffer, timestamps = down_sample_if_needed(glob_buffer, glob_sfreq, expected_sfreq, glob_timestamps)
+    handle_focus_calibration(buffer, timestamps, expected_sfreq, glob_channel_idxs, clips_infos)
+    
     return {"msg": "succesfully calibrated"}, 200
     
 

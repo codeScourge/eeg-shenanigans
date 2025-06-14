@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Configuration
     const TOTAL_VIDEOS = 3;
-    const VIDEO_DURATION = 15; // seconds
+    const VIDEO_DURATION = 30; // seconds
     const COUNTDOWN_DURATION = 3; // seconds
     const FEEDBACK_COUNTDOWN = 2; // seconds
     
